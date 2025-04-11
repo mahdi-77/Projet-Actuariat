@@ -1,0 +1,2 @@
+"0","horizon=50"
+"0","LCfor <- forecast(LCfit, h = horizon)"

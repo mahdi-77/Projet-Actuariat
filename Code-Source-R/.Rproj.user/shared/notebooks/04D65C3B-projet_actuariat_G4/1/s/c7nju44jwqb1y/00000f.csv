@@ -1,0 +1,28 @@
+"0","library(""demography"")
+"
+"2","Loading required package: forecast
+"
+"2","Registered S3 method overwritten by 'quantmod':
+  method            from
+  as.zoo.data.frame zoo 
+"
+"2","This is forecast 8.16 
+  Use suppressPackageStartupMessages() to eliminate package startup messages.
+"
+"2","Registered S3 method overwritten by 'htmlwidgets':
+  method           from         
+  print.htmlwidget tools:rstudio
+"
+"2","Registered S3 method overwritten by 'data.table':
+  method           from
+  print.data.table     
+"
+"2","Registered S3 methods overwritten by 'demography':
+  method      from 
+  print.lca   e1071
+  summary.lca e1071
+"
+"2","This is demography 1.22 
+
+"
+"0","library(""forecast"")"

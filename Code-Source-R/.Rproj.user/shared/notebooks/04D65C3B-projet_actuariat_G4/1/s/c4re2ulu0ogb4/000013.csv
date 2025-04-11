@@ -1,0 +1,1 @@
+"0","plot(italyDemo,series=""total"",datatype=""rate"",plot.type=""time"", main=""Total rates"",xlab=""Years"")"

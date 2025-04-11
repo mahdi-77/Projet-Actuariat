@@ -1,0 +1,291 @@
+---
+title: "Projet_actuariat_vie_G4"
+output: html_document
+date: '2022-03-25'
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+# Sujet 6 : Influence du taux d’intérêt sur la valeur actuelle probable (VAP) d’une rente viagère 
+
+#  Installation des packages 
+
+```{r}
+library("demography")
+library("forecast")
+```
+
+-------------------------------------------------------------------------------------
+## 1- Télécharger les données pour le pays concerné
+```{r}
+italyDemo<-hmd.mx(country="ITA", username="marwa.guemira@esprit.tn",password="1587057939", label="Italy")
+```
+```{r}
+italyDemo$year
+```
+```{r}
+italyDemo
+```
+## Long death rate  / Age
+```{r}
+# Méthode 1
+par(mfrow=c(1,3))
+plot(italyDemo,series="male",datatype="rate", main="Male rates")
+plot(italyDemo,series="female",datatype="rate", main="Female rates")
+plot(italyDemo,series="total",datatype="rate", main="Total rates")
+```
+-----------------------------------------------------------------
+## Long death rate  / Years 
+
+```{r}
+par(mfrow=c(1,3))
+plot(italyDemo,series="male",datatype="rate",plot.type="time", main="Male rates",xlab="Years")
+plot(italyDemo,series="female",datatype="rate",plot.type="time", main="Female rates",xlab="Years")
+plot(italyDemo,series="total",datatype="rate",plot.type="time", main="Total rates",xlab="Years")
+```
+
+--------------------------------------------------------------------------------
+## Question 5: Estimer les paramètres d’un modèle de Lee-Carter à partir des données historiques téléchargées (on pourra utiliser la fonction fit du package StMoMo).
+### 1- La Méthode Avec LCA Function
+#LeeCarter est ici appliqué séparément entre la population masculine, féminine et totale et en considérant un âge maximum égal à 100.
+
+```{r}
+italyLcaM<-lca(italyDemo,series="male",max.age=100,interpolate = TRUE)
+italyLcaF<-lca(italyDemo,series="female",max.age=100,interpolate = TRUE)
+italyLcaT<-lca(italyDemo,series="total",max.age=100,interpolate = TRUE)
+```
+
+
+### - lca() retourne un objet qui nous permet d'inspecter ax, bx et kt. Les chiffres représentent les valeurs des paramètres estimés dans la courbe.
+
+
+```{r}
+par(mfrow=c(1,3))
+plot(italyLcaT$ax, main="ax", xlab="Age",ylab="ax",type="l")
+lines(x=italyLcaF$age, y=italyLcaF$ax, main="ax", col="red")
+lines(x=italyLcaM$age, y=italyLcaM$ax, main="ax", col="blue")
+
+legend("topleft" , c("Male","Female","Total"),cex=0.8,col=c("blue","red","black"),lty=1);
+plot(italyLcaT$bx, main="bx", xlab="Age",ylab="bx",type="l")
+lines(x=italyLcaF$age, y=italyLcaF$bx, main="bx", col="red")
+lines(x=italyLcaM$age, y=italyLcaM$bx, main="bx", col="blue")
+legend("topright" , c("Male","Female","Total"),cex=0.8,col=c("blue","red","black"),lty=1);
+plot(italyLcaT$kt, main="kt", xlab="Year",ylab="kt",type="l")
+lines(x=italyLcaF$year, y=italyLcaF$kt, main="kt", col="red")
+lines(x=italyLcaM$year, y=italyLcaM$kt, main="kt", col="blue")
+legend("topright" , c("Male","Female","Total"),cex=0.8,col=c("blue","red","black"),lty=1);
+```
+
+### Pour mieux visualiser la courbe de kt et prendre des décisions précises après dans l'estimation des coefficients du modèle:
+
+
+```{r}
+plot(italyLcaT$kt, main="kt", xlab="Year",ylab="kt",type="l")
+lines(x=italyLcaF$year, y=italyLcaF$kt, main="kt", col="red")
+lines(x=italyLcaM$year, y=italyLcaM$kt, main="kt", col="blue")
+legend("topright" , c("Male","Female","Total"),cex=0.8,col=c("blue","red","black"),lty=1);
+```
+
+
+## Interprétation:
+- Un comportement similaire des paramètres est observé selon différents ensembles de données.
+- Comme prévu la mortalité moyenne augmente lorsque l'âge augmente (voir schéma ax). En outre, il est clairement visible la jeune bosse de mortalité pour les hommes dans la tranche d'âge (20,30) en raison de décès accidentels.
+- bx montre plutôt une valeur plus élevée pour les jeunes âges et une plus grande amélioration pour les la tranche d'âge (60-80). 
+- Comme prévu, kt a une tendance à la baisse avec l'augmentation de temps.
+
+### 2- La Méthode Avec "StMoMo" package
+```{r}
+# Télécharger le package StMoMo qu'on va travailler avec
+#install.packages("StMoMo")
+```
+```{r}
+library("StMoMo")
+```
+#Charger les données
+#Utiliser le nombre total de décès, expositions en milieu d'année
+
+```{r}
+ita.StMoMoData<-StMoMoData(data=italyDemo, series = "total",type="central")
+```
+#Porter les données à l'année initiale 
+#Avec central2initial, on transforme les données StMoMo des expositions centrales en expositions initiales. Les expositions initiales sont calculées en ajoutant la moitié des décès aux expositions centrales.
+
+```{r}
+ita.StMoMoData.Ini<-central2initial(ita.StMoMoData)
+ita.StMoMoData.Ini
+
+```
+#Assurer un âge maximum 100 ans
+
+```{r}
+ages.fit = 0:100
+```
+#generate weight matrix==> Génère une matrice de poids en fonction d'un groupe d'âge et d'années et d'un ensemble de cohortes étant donné un poids nul. Ceci est utile pour exclure certains points de données lors de l'ajustement d'une mortalité stochastique Modèle.
+#Clip ==> nombre de cohortes dans la limite pour attribuer un poids nul. Cela peut être utilisé pour peser zéro certaines des premières et dernières cohortes dans les données.
+
+```{r}
+wxt <- genWeightMat(ages = ages.fit, years = ita.StMoMoData.Ini$years,clip = 3)
+```
+#Ajustemeent du modèle 
+## LC
+```{r}
+LC <- lc(link = "log")
+LCfit <- fit(LC, data = ita.StMoMoData.Ini, ages.fit = ages.fit, wxt = wxt)
+LCfit
+```
+```{r}
+plot(LCfit)
+```
+## Interprétation:
+- Les paramètres (ax) représentent la tendance liée à l’effet isolé de l’âge sur les taux de mortalité. Exactement comme pour le données empiriques, on obtient une fonction unimodale décroissante pour les âges faibles inférieur à 10 ans puis une forte croissante jusqu’à la fin de la vie.
+
+- Les paramètres (bx) représentent l’interaction de l’effet des années calendaires sur les taux de mortalité. Cet effet est toujours positif mais la valeur ne cesse de diminuer avec l’âge. Autrement dit, l’effet des années calendaires agit majoritairement avant 60 ans et de moins en moins au delà. On constate une bosse à 22 ans. Pour des âges élevés, l’effet est quasi-inexistant puisque bx à peu prés est égale à zéro.
+
+- Enfin, comme prévu, kt a une tendance à la baisse avec l'aide de temps
+-------------------------------------------------------------------------------
+
+## Question 6:
+
+## Projeter les taux de mortalité
+
+```{r}
+library(forecast)
+```
+
+#En utilisant LCA 
+#On peut donc utiliser le package Forecast pour projeter les futurs kts (jusqu'à 110).La projection est basé sur l'extrapolation ARIMA.
+#Projection des ajustements individuels pour les 50 prochaines années
+
+```{r}
+fT<-forecast(italyLcaT,h=50)
+```
+
+# Projection sur les prochaines 50 années
+
+```{r}
+plot(fT$kt.f,main="Total")
+```
+
+### 5- Afficher les log taux de mortalité historiques et projetés pour la cohorte concernée. On pourra utiliser la fonction extractcohort.
+
+
+### extractCohort :
+Extraire des cohortes à partir d'un tableau âge-période. Ceci est utile pour construire une table de mortalité ou pour effectuer des calculs actuariels / démographiques sur une base de cohorte en utilisant la sortie de plusieurs fonctions dans StMoMo 
+##### Une cohorte
+désigne un ensemble d'individus ayant vécu un même événement au cours d'une même période :
+cohort = 1943 => 2018-75 = period-age
+
+```{r}
+library("lifecontingencies")
+```
+### 4. Projeter les taux de mortalité à l’aide de la fonction forecast. On prendra soin de bien justifier le choix du nombre d’années pour la projection du modèle.
+
+```{r}
+horizon=50
+LCfor <- forecast(LCfit, h = horizon)
+```
+
+```{r}
+LCfor
+```
+
+```{r}
+plot(LCfor,only.kt=TRUE)
+```
+
+```{r}
+lc_historical_rates1 <- extractCohort(fitted(LCfit, type = "rates"),cohort=1943)
+lc_forecasted_rates1 <- extractCohort(LCfor$rates, cohort = 1943)
+lc_rates_2018 <- c(lc_historical_rates1,lc_forecasted_rates1)
+```
+
+
+
+```{r}
+plot(0:74,lc_historical_rates1 , type = "l", xlim = c(0,100), xlab = "age", ylab = "q(x)",
+main = "log de taux de mortalité pour la cohorte 1943  " ,log = "y")
+lines(75:100,lc_forecasted_rates1,col = "red", lty = 2, lwd = 2 )
+
+```
+
+
+
+```{r}
+plot(0:74,lc_historical_rates1 , type = "l", xlim = c(0,100), xlab = "age", ylab = "q(x)",
+ main = "taux de mortalité pour la cohorte 1943" )
+lines(75:100,lc_forecasted_rates1,col = "red", lty = 2, lwd = 2 )
+```
+
+
+
+```{r}
+head(lc_rates_2018,30)
+```
+-------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r eruptions, echo=FALSE}
+inputPanel(
+  selectInput("n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2)
+)
+
+renderPlot({
+  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
+       xlab = "Duration (minutes)", main = "Geyser eruption duration")
+  
+  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
+  lines(dens, col = "blue")
+})
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE}
+shinyAppDir(
+  system.file("examples/06_tabsets", package = "shiny"),
+  options = list(
+    width = "100%", height = 550
+  )
+)
+```
+
+Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+
+You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+
+In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+
+
+

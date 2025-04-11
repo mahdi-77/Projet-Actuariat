@@ -1,0 +1,9 @@
+"0","italyDemo<-hmd.mx(country=""ITA"", username=""marwa.guemira@esprit.tn"",password=""1587057939"", label=""Italy"")"
+"2","Warning in hmd.mx(country = ""ITA"", username = ""marwa.guemira@esprit.tn"",  :"
+"2","
+ "
+"2"," NAs introduced by coercion
+"
+"0","```{r}"
+"2","Error: attempt to use zero-length variable name
+"

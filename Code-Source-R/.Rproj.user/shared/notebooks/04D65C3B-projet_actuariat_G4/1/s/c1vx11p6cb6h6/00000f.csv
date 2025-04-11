@@ -1,0 +1,3 @@
+"0","italyLcaM<-lca(italyDemo,series=""male"",max.age=100,interpolate = TRUE)"
+"0","italyLcaF<-lca(italyDemo,series=""female"",max.age=100,interpolate = TRUE)"
+"0","italyLcaT<-lca(italyDemo,series=""total"",max.age=100,interpolate = TRUE)"

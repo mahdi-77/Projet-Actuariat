@@ -1,0 +1,1 @@
+"0","wxt <- genWeightMat(ages = ages.fit, years = ita.StMoMoData.Ini$years,clip = 3)"
